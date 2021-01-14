@@ -1,0 +1,24 @@
+management:
+  endpoints:
+    web:
+      exposure:
+        include: prometheus
+
+scraper:
+  state:
+    path: /var/cfengine/state/
+  interval:
+    millis: 60000
+
+server:
+  port: 9191
+
+spring:
+  datasource:
+    url: jdbc:postgresql://127.0.0.1:5432/cfdb?stringtype=unspecified
+    username: cfpostgres
+  jpa:
+    database: POSTGRESQL
+    hibernate:
+      ddl-auto: none
+    show-sql: false
