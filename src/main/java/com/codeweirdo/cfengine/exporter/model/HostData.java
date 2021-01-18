@@ -94,7 +94,7 @@ public class HostData {
             }
             if (changesRepairedCounter == null) {
                 changesRepairedCounter = Counter
-                        .builder("cfengine.promises.repaired.total")
+                        .builder("cfengine.changes.repaired.total")
                         .description("The number of changes that were repaired by CFEngine")
                         .tag("ip", host)
                         .register(meterRegistry);

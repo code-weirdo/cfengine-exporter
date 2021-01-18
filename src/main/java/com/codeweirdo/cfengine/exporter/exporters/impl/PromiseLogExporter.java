@@ -20,6 +20,7 @@ import java.io.IOException;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 
 @Slf4j
 @Component
@@ -41,6 +42,7 @@ public class PromiseLogExporter implements Exporter {
     ConfigurableApplicationContext applicationContext;
 
     private final int MAX_MISSED_SCRAPE_INTERVALS = 3;
+    private final int REPORTING_LATENCY_MINUTES = 15;
     private final String SCRAPE_FILE_NAME = "scrape_state.json";
     private ScrapeState scrapeState;
 
@@ -55,28 +57,42 @@ public class PromiseLogExporter implements Exporter {
     }
 
     private void update() {
-        log.trace("Starting updated[{}]", PromiseLogExporter.class.getName());
+        log.debug("Starting updated[{}]", PromiseLogExporter.class.getName());
 
-        Instant now = Instant.now();
+        Instant now = Instant.now().truncatedTo(ChronoUnit.SECONDS);
         Instant lastCheckTime = scrapeState.getLastScrapeTime();
         Instant lastAllowableCheckTime = now.minus(Duration.ofMillis(scraperIntervalMillis * MAX_MISSED_SCRAPE_INTERVALS));
 
         if (lastCheckTime.isAfter(lastAllowableCheckTime)) {
+            log.debug("Checking promise logs for updates between {} and {}", lastCheckTime, now);
             hostDataRegistry.getHostKeys()
                     .forEach(hostKey -> {
                         HostData hostData = hostDataRegistry.getHostData(hostKey);
+                        log.debug("[{}] Checking promise logs for host: {}", hostData.getHost(), hostKey);
                         // Update the gauges that show the state of the last run through of policies
-                        hostData.setPromisesKept(promiseExecutionRepository.countByHostKeyAndPromiseOutcome(hostKey, PromiseOutcome.KEPT));
-                        hostData.setPromisesNotKept(promiseExecutionRepository.countByHostKeyAndPromiseOutcome(hostKey, PromiseOutcome.NOTKEPT));
-                        hostData.setPromisesRepaired(promiseExecutionRepository.countByHostKeyAndPromiseOutcome(hostKey, PromiseOutcome.REPAIRED));
+                        long promisesKept = promiseExecutionRepository.countByHostKeyAndPromiseOutcome(hostKey, PromiseOutcome.KEPT);
+                        long promisesNotKept = promiseExecutionRepository.countByHostKeyAndPromiseOutcome(hostKey, PromiseOutcome.NOTKEPT);
+                        long promisesRepaired = promiseExecutionRepository.countByHostKeyAndPromiseOutcome(hostKey, PromiseOutcome.REPAIRED);
+                        log.debug("[{}] - Promises: Kept[{}], Not Kept[{}], Repaired[{}]", hostData.getHost(), promisesKept, promisesNotKept, promisesRepaired);
+                        hostData.setPromisesKept(promisesKept);
+                        hostData.setPromisesNotKept(promisesNotKept);
+                        hostData.setPromisesRepaired(promisesRepaired);
                         // Update the counters with the number of changes that have been made to the host
-                        hostData.incrementChangesNotKept(promiseLogRepository.countByHostKeyAndPromiseOutcome(hostKey, PromiseOutcome.NOTKEPT, lastCheckTime, now));
-                        hostData.incrementChangesRepaired(promiseLogRepository.countByHostKeyAndPromiseOutcome(hostKey, PromiseOutcome.REPAIRED, lastCheckTime, now));
+                        Instant startTime = lastCheckTime.minus(Duration.ofMinutes(REPORTING_LATENCY_MINUTES));
+                        Instant endTime = now.minus(Duration.ofMinutes(REPORTING_LATENCY_MINUTES));
+                        long changesNotKept = promiseLogRepository.countByHostKeyAndPromiseOutcome(hostKey, PromiseOutcome.NOTKEPT, startTime, endTime);
+                        long changesRepaired = promiseLogRepository.countByHostKeyAndPromiseOutcome(hostKey, PromiseOutcome.REPAIRED, startTime, endTime);
+                        log.debug("[{}] - Changes: Not Kept[{}], Repaired[{}]", hostData.getHost(), changesNotKept, changesRepaired);
+                        hostData.incrementChangesNotKept(changesNotKept);
+                        hostData.incrementChangesRepaired(changesRepaired);
                     });
+        } else {
+            log.debug("Outside allowable check time {}, syncing...", lastAllowableCheckTime);
         }
+
         scrapeState.setLastScrapeTime(now);
         storeScrapeState(statePath, scrapeState);
-        hostDataRegistry.refesh();
+        hostDataRegistry.refresh();
 
         log.trace("Completed updated[{}]", PromiseLogExporter.class.getName());
     }

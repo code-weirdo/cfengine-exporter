@@ -20,16 +20,13 @@ public class HostDataRegistry {
     }
 
     public HostData getHostData(String hostKey) {
+        hostData.computeIfAbsent(hostKey, (k) -> new HostData(meterRegistry));
         return hostData.get(hostKey);
     }
 
-    public HostData createEntryIfMissing(String key) {
-        hostData.computeIfAbsent(key, (k) -> new HostData(meterRegistry));
-        return hostData.get(key);
-    }
-
-    public synchronized void refesh() {
+    public synchronized void refresh() {
         hostData.forEach((key, value) -> value.refreshMetrics());
     }
+
 }
 

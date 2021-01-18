@@ -35,19 +35,22 @@ public class LastSeenExporter implements Exporter {
     }
 
     private void update() {
-        log.trace("Starting updated[{}]", LastSeenExporter.class.getName());
+        log.debug("Starting updated[{}]", LastSeenExporter.class.getName());
         hostRepository.findAll()
                 .forEach(host -> {
                     List<LastSeenHost> lastSeenHostEntries = lastSeenHostsRepository.findByRemoteHostKey(host.getHostKey());
+                    HostData hostData = hostDataRegistry.getHostData(host.getHostKey());
                     if (lastSeenHostEntries.size() > 0) {
-                        HostData hostData = hostDataRegistry.createEntryIfMissing(host.getHostKey());
                         updateIpAddress(lastSeenHostEntries, hostData);
                         updateLastSeen(lastSeenHostEntries, hostData);
-                        log.trace("Host: {} last seen updated to {}", hostData.getHost(), hostData.getLastSeen());
+                        log.debug("[{}]: last seen updated to {}", hostData.getHost(), hostData.getLastSeen());
+                    }
+                    else {
+                        log.debug("[{}]: No last seen entries for host [{}]", hostData.getHost(), host.getHostKey());
                     }
                 });
-        hostDataRegistry.refesh();
-        log.trace("Update completed[{}]", LastSeenExporter.class.getName());
+        hostDataRegistry.refresh();
+        log.debug("Update completed[{}]", LastSeenExporter.class.getName());
     }
 
     private void updateIpAddress(List<LastSeenHost> lastSeenHostEntries, HostData hostData) {
