@@ -31,7 +31,7 @@ $ java -version
 Download the CFEngine Exporter:
 
 ~~~
-$ wget https://github.com/code-weirdo/cfengine-exporter/releases/download/v1.0.0/cfengine-exporter-1.0.0.jar -O cfengine-exporter.jar
+$ wget https://github.com/code-weirdo/cfengine-exporter/releases/download/v1.0.1/cfengine-exporter-1.0.1.jar -O cfengine-exporter.jar
 ~~~
 
 Run the CFEngine Exporter:
